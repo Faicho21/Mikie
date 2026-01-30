@@ -1,0 +1,51 @@
+// Schema para sistema de control de stock y ventas
+// Drugstore / Maxikiosco - Offline First
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Empleado {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  pin       String   @unique // PIN de acceso
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  movimientos MovimientoStock[]
+}
+
+model Producto {
+  id           Int      @id @default(autoincrement())
+  nombre       String
+  codigoBarra  String?  @unique // Código de barras (EAN/UPC)
+  precio       Float
+  stock        Int      @default(0)
+  stockMinimo  Int?     @default(0) // Alerta cuando stock <= stockMinimo
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  movimientos MovimientoStock[]
+}
+
+model MovimientoStock {
+  id         Int      @id @default(autoincrement())
+  empleadoId Int
+  productoId Int
+  cantidad   Int      // Positivo para venta, negativo para reposición
+  tipo       String   // "venta" | "reposicion" | "ajuste"
+  fecha      DateTime @default(now())
+  
+  empleado   Empleado @relation(fields: [empleadoId], references: [id])
+  producto   Producto @relation(fields: [productoId], references: [id])
+  
+  @@index([empleadoId])
+  @@index([productoId])
+  @@index([fecha])
+}

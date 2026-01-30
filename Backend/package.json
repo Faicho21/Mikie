@@ -1,0 +1,27 @@
+{
+  "name": "mikie-backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch index.js",
+    "start": "node index.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "seed": "node scripts/seed.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Backend para sistema de control de stock y ventas",
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "@prisma/adapter-better-sqlite3": "^7.3.0",
+    "@prisma/client": "^7.3.0",
+    "better-sqlite3": "^12.6.2",
+    "dotenv": "^16.4.5",
+    "fastify": "^5.7.2",
+    "prisma": "^7.3.0"
+  }
+}

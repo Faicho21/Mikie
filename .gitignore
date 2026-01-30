@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment
+.env
+.env.local
+
+# Database
+Backend/data.db
+Backend/data.db-journal
+Backend/prisma/*.db
+Backend/prisma/*.db-journal
+
+# Build
+Frontend/dist/
+Frontend/.vite/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
