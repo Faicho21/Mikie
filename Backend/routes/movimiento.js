@@ -55,7 +55,7 @@ export default async function movimientoRoutes(fastify, options) {
             select: { id: true, nombre: true }
           },
           producto: {
-            select: { id: true, nombre: true, precio: true }
+            select: { id: true, nombre: true, marca: true, precio: true }
           }
         }
       });
@@ -145,7 +145,7 @@ export default async function movimientoRoutes(fastify, options) {
             formaPago: formaPagoValida
           },
           include: {
-            producto: { select: { id: true, nombre: true, precio: true } }
+            producto: { select: { id: true, nombre: true, marca: true, precio: true } }
           }
         });
         resultados.push(movimiento);
@@ -197,7 +197,7 @@ export default async function movimientoRoutes(fastify, options) {
             select: { id: true, nombre: true }
           },
           producto: {
-            select: { id: true, nombre: true }
+            select: { id: true, nombre: true, marca: true }
           }
         }
       });
@@ -243,7 +243,7 @@ export default async function movimientoRoutes(fastify, options) {
         where,
         include: {
           empleado: { select: { id: true, nombre: true } },
-          producto: { select: { id: true, nombre: true, precio: true } }
+          producto: { select: { id: true, nombre: true, marca: true, precio: true } }
         },
         orderBy: { fecha: 'desc' },
         take,

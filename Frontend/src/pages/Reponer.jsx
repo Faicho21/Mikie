@@ -1,9 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FixedSizeList as List } from 'react-window';
+import { ROUTES } from '../constants/routes';
 import { getAllProductos, registrarReposicion, updateProducto, createProducto, deleteProducto, isOnline } from '../services/api';
 import { getAllProductosFromCache } from '../services/storage';
+import { getProductLabel } from '../utils/producto';
 import EscanerCodigo from '../components/EscanerCodigo';
+
+const ORDEN_OPCIONES = [
+  { value: 'nombre', label: 'Nombre' },
+  { value: 'precio', label: 'Precio' },
+  { value: 'stock', label: 'Stock' }
+];
 
 function Reponer({ empleado }) {
   const navigate = useNavigate();
@@ -15,11 +23,14 @@ function Reponer({ empleado }) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
   const [filtro, setFiltro] = useState('');
+  const [orden, setOrden] = useState('nombre');
+  const [soloStockBajo, setSoloStockBajo] = useState(false);
   const [mostrarNuevoProducto, setMostrarNuevoProducto] = useState(false);
   const [guardandoNuevo, setGuardandoNuevo] = useState(false);
   const [modoEliminar, setModoEliminar] = useState(false);
   const [eliminandoId, setEliminandoId] = useState(null);
   const [nuevoNombre, setNuevoNombre] = useState('');
+  const [nuevoMarca, setNuevoMarca] = useState('');
   const [nuevoCodigo, setNuevoCodigo] = useState('');
   const [nuevoPrecio, setNuevoPrecio] = useState('');
   const [nuevoStock, setNuevoStock] = useState('0');
@@ -102,11 +113,13 @@ function Reponer({ empleado }) {
     try {
       await createProducto({
         nombre: nombreTrim,
+        marca: nuevoMarca.trim() || undefined,
         codigoBarra: nuevoCodigo.trim() || undefined,
         precio: precioNum,
         stock: stockNum >= 0 ? stockNum : 0,
       });
       setNuevoNombre('');
+      setNuevoMarca('');
       setNuevoCodigo('');
       setNuevoPrecio('');
       setNuevoStock('0');
@@ -120,7 +133,7 @@ function Reponer({ empleado }) {
   };
 
   const handleEliminarProducto = async (p) => {
-    if (!window.confirm(`¿Eliminar el producto "${p.nombre}"? Ya no aparecerá en el listado.`)) return;
+    if (!window.confirm(`¿Eliminar "${getProductLabel(p)}"? Ya no aparecerá en el listado.`)) return;
     setEliminandoId(p.id);
     setError('');
     try {
@@ -135,11 +148,29 @@ function Reponer({ empleado }) {
     }
   };
 
-  const productosFiltrados = productos.filter(
-    (p) =>
-      !filtro.trim() ||
-      (p.nombre && p.nombre.toLowerCase().includes(filtro.toLowerCase())) ||
-      (p.codigoBarra && p.codigoBarra.includes(filtro))
+  const productosFiltrados = productos
+    .filter((p) => {
+      if (soloStockBajo) {
+        const minimo = p.stockMinimo != null ? p.stockMinimo : 0;
+        if (p.stock > minimo) return false;
+      }
+      if (!filtro.trim()) return true;
+      const t = filtro.toLowerCase();
+      return (
+        (p.nombre && p.nombre.toLowerCase().includes(t)) ||
+        (p.marca && p.marca.toLowerCase().includes(t)) ||
+        (p.codigoBarra && p.codigoBarra.includes(filtro))
+      );
+    })
+    .sort((a, b) => {
+      if (orden === 'nombre') return (a.nombre || '').localeCompare(b.nombre || '');
+      if (orden === 'precio') return (a.precio || 0) - (b.precio || 0);
+      if (orden === 'stock') return (a.stock || 0) - (b.stock || 0);
+      return 0;
+    });
+
+  const conStockBajo = productos.filter(
+    (p) => (p.stockMinimo != null ? p.stock <= p.stockMinimo : p.stock <= 0)
   );
 
   if (mostrarEscanerCodigo) {
@@ -156,18 +187,18 @@ function Reponer({ empleado }) {
 
   if (loading) {
     return (
-      <div className="container vista-page" style={{ paddingTop: '50%', textAlign: 'center' }}>
-        <p className="text-muted">Cargando...</p>
+      <div className="container productos-page" style={{ paddingTop: '50%', textAlign: 'center' }}>
+        <p className="text-muted">Cargando productos...</p>
       </div>
     );
   }
 
   return (
-    <div className="container vista-page">
+    <div className="container vista-page productos-page">
       <header className="vista-header">
         <div className="flex justify-between items-center">
           <h1>Reponer Stock</h1>
-          <button onClick={() => navigate('/')} className="btn-secondary">
+          <button onClick={() => navigate(ROUTES.HOME)} className="btn-secondary">
             Volver
           </button>
         </div>
@@ -177,27 +208,53 @@ function Reponer({ empleado }) {
         <input
           type="text"
           className="productos-search"
-          placeholder="Buscar por nombre o código"
+          placeholder="Buscar por nombre, marca o código"
           value={filtro}
           onChange={(e) => setFiltro(e.target.value)}
         />
-        <button
-          type="button"
-          onClick={() => { setMostrarNuevoProducto(!mostrarNuevoProducto); setError(''); setProductoSeleccionado(null); setModoEliminar(false); }}
-          className="btn-primary"
-          style={{ width: '100%', marginTop: '12px', padding: '14px' }}
-        >
-          {mostrarNuevoProducto ? 'Cancelar' : 'Agregar producto'}
-        </button>
-        <button
-          type="button"
-          onClick={() => { setModoEliminar(!modoEliminar); setError(''); setProductoSeleccionado(null); setMostrarNuevoProducto(false); }}
-          className="btn-secondary"
-          style={{ width: '100%', marginTop: '10px', padding: '14px' }}
-        >
-          {modoEliminar ? 'Cancelar' : 'Eliminar producto'}
-        </button>
+        <div className="productos-toolbar">
+          <select
+            className="productos-select"
+            value={orden}
+            onChange={(e) => setOrden(e.target.value)}
+            aria-label="Ordenar por"
+          >
+            {ORDEN_OPCIONES.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          <label className="productos-checkbox-wrap">
+            <input
+              type="checkbox"
+              checked={soloStockBajo}
+              onChange={(e) => setSoloStockBajo(e.target.checked)}
+            />
+            <span>Solo stock bajo ({conStockBajo.length})</span>
+          </label>
+          <button
+            type="button"
+            onClick={() => { setMostrarNuevoProducto(!mostrarNuevoProducto); setError(''); setProductoSeleccionado(null); setModoEliminar(false); }}
+            className={mostrarNuevoProducto ? 'btn-secondary' : 'btn-primary'}
+            style={{ marginLeft: 'auto', padding: '8px 14px' }}
+          >
+            {mostrarNuevoProducto ? 'Cancelar' : 'Agregar producto'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setModoEliminar(!modoEliminar); setError(''); setProductoSeleccionado(null); setMostrarNuevoProducto(false); }}
+            className={modoEliminar ? 'btn-secondary' : 'btn-secondary'}
+            style={{ padding: '8px 14px' }}
+          >
+            {modoEliminar ? 'Cancelar eliminar' : 'Eliminar producto'}
+          </button>
+        </div>
       </section>
+
+      {conStockBajo.length > 0 && !soloStockBajo && (
+        <div className="productos-alerta-stock">
+          <strong>Stock bajo:</strong> {conStockBajo.length} producto(s) en o por debajo del mínimo.
+        </div>
+      )}
 
       {mostrarNuevoProducto && (
         <div className="reponer-form-card" style={{ borderLeftColor: 'var(--green-accent)' }}>
@@ -209,8 +266,17 @@ function Reponer({ empleado }) {
                 type="text"
                 value={nuevoNombre}
                 onChange={(e) => setNuevoNombre(e.target.value)}
-                placeholder="Ej: Repelente Off"
+                placeholder="Ej: Agua"
                 required
+              />
+            </div>
+            <div className="mb-3">
+              <label className="block mb-2">Marca (opcional)</label>
+              <input
+                type="text"
+                value={nuevoMarca}
+                onChange={(e) => setNuevoMarca(e.target.value)}
+                placeholder="Ej: Villa del sur"
               />
             </div>
             <div className="mb-3">
@@ -264,7 +330,7 @@ function Reponer({ empleado }) {
               </button>
               <button
                 type="button"
-                onClick={() => { setMostrarNuevoProducto(false); setNuevoNombre(''); setNuevoCodigo(''); setNuevoPrecio(''); setNuevoStock('0'); setError(''); }}
+                onClick={() => { setMostrarNuevoProducto(false); setNuevoNombre(''); setNuevoMarca(''); setNuevoCodigo(''); setNuevoPrecio(''); setNuevoStock('0'); setError(''); }}
                 className="btn-secondary"
                 disabled={guardandoNuevo}
               >
@@ -276,14 +342,18 @@ function Reponer({ empleado }) {
       )}
 
       {error && (
-        <div className="vista-card alert-error">
+        <div className="card mb-3 alert-error">
           {error}
         </div>
       )}
 
       {productoSeleccionado ? (
         <div className="reponer-form-card">
-          <h3 className="font-bold mb-2">{productoSeleccionado.nombre}</h3>
+          <h3 className="font-bold mb-2">
+            {productoSeleccionado.marca
+              ? `${productoSeleccionado.nombre} · ${productoSeleccionado.marca}`
+              : productoSeleccionado.nombre}
+          </h3>
           <p className="text-muted text-sm mb-3">Stock actual: {productoSeleccionado.stock}</p>
           <div className="mb-3">
             <label className="block mb-2">Cantidad a reponer</label>
@@ -338,11 +408,11 @@ function Reponer({ empleado }) {
       )}
 
       {productosFiltrados.length > 0 && (
-        <div className="reponer-list-container">
+        <div className="productos-list-container">
           <List
-            height={Math.min(window.innerHeight * 0.45, 380)}
+            height={Math.min(window.innerHeight * 0.55, 420)}
             itemCount={productosFiltrados.length}
-            itemSize={100}
+            itemSize={72}
             width="100%"
             itemData={{
               list: productosFiltrados,
@@ -360,9 +430,9 @@ function Reponer({ empleado }) {
               const minimo = p.stockMinimo != null ? p.stockMinimo : 0;
               const esBajo = p.stock <= minimo;
               return (
-                <div style={style} className="reponer-list-item">
+                <div style={style} className="productos-list-item">
                   <div
-                    className={`producto-card ${esBajo ? 'stock-bajo' : ''}`}
+                    className={`producto-card producto-card-list ${esBajo ? 'stock-bajo' : ''}`}
                     style={data.modoEliminar ? { display: 'flex', alignItems: 'center', gap: '12px' } : undefined}
                     onClick={() => {
                       if (data.modoEliminar) {
@@ -388,27 +458,34 @@ function Reponer({ empleado }) {
                       }
                     }}
                   >
-                    <div style={{ flex: 1 }}>
-                      <h3 className="producto-nombre">{p.nombre}</h3>
-                      {p.codigoBarra && <p className="producto-codigo">Código: {p.codigoBarra}</p>}
-                      <div className="producto-meta">
-                        <div>
-                          <p className="producto-stock">Stock: {p.stock}</p>
-                          {esBajo && <span className="badge badge-stock-bajo">Stock bajo</span>}
-                        </div>
-                      </div>
+                    <div className="producto-card-list-main" style={{ flex: 1, minWidth: 0 }}>
+                      <h3 className="producto-nombre">{getProductLabel(p)}</h3>
+                      {p.codigoBarra && (
+                        <span className="producto-codigo">· {p.codigoBarra}</span>
+                      )}
                     </div>
-                    {data.modoEliminar && (
-                      <button
-                        type="button"
-                        className="btn-danger"
-                        disabled={data.eliminandoId === p.id}
-                        onClick={(e) => { e.stopPropagation(); data.handleEliminarProducto(p); }}
-                        style={{ flexShrink: 0, marginLeft: '12px' }}
-                      >
-                        {data.eliminandoId === p.id ? 'Eliminando...' : 'Eliminar'}
-                      </button>
-                    )}
+                    <div className="producto-card-list-meta">
+                      <span className="producto-precio">
+                        ${typeof p.precio === 'number' ? p.precio.toFixed(2) : p.precio}
+                      </span>
+                      <span className="producto-stock">Stock: {p.stock}</span>
+                      {esBajo && (
+                        <span className="badge badge-stock-bajo">Bajo</span>
+                      )}
+                      {data.modoEliminar ? (
+                        <button
+                          type="button"
+                          className="btn-danger"
+                          disabled={data.eliminandoId === p.id}
+                          onClick={(e) => { e.stopPropagation(); data.handleEliminarProducto(p); }}
+                          style={{ padding: '4px 10px', fontSize: '12px' }}
+                        >
+                          {data.eliminandoId === p.id ? '...' : 'Eliminar'}
+                        </button>
+                      ) : (
+                        <span className="badge-action">Reponer</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -419,7 +496,7 @@ function Reponer({ empleado }) {
 
       {productosFiltrados.length === 0 && !error && (
         <div className="productos-empty">
-          No hay productos
+          No hay productos{filtro || soloStockBajo ? ' que coincidan con el filtro' : ''}.
         </div>
       )}
     </div>

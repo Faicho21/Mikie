@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FixedSizeList as List } from 'react-window';
+import { ROUTES } from '../constants/routes';
 import { getAllProductos, isOnline } from '../services/api';
 import { getAllProductosFromCache } from '../services/storage';
+import { getProductLabel } from '../utils/producto';
 
 const ORDEN_OPCIONES = [
   { value: 'nombre', label: 'Nombre' },
@@ -53,7 +55,7 @@ function Productos({ empleado }) {
   const handleIrAVenta = (producto) => {
     const codigo = producto.codigoBarra || producto.nombre;
     const carritoPrevio = location.state?.carritoDesdeVenta ?? [];
-    navigate(`/venta?codigo=${encodeURIComponent(codigo)}`, {
+    navigate(`${ROUTES.VENTA}?codigo=${encodeURIComponent(codigo)}`, {
       state: { carritoPrevio }
     });
   };
@@ -68,6 +70,7 @@ function Productos({ empleado }) {
       const t = filtro.toLowerCase();
       return (
         (p.nombre && p.nombre.toLowerCase().includes(t)) ||
+        (p.marca && p.marca.toLowerCase().includes(t)) ||
         (p.codigoBarra && p.codigoBarra.includes(filtro))
       );
     })
@@ -95,7 +98,7 @@ function Productos({ empleado }) {
       <header className="vista-header">
         <div className="flex justify-between items-center">
           <h1>Listado de Productos</h1>
-          <button onClick={() => navigate('/')} className="btn-secondary">
+          <button onClick={() => navigate(ROUTES.HOME)} className="btn-secondary">
             Volver
           </button>
         </div>
@@ -105,7 +108,7 @@ function Productos({ empleado }) {
         <input
           type="text"
           className="productos-search"
-          placeholder="Buscar por nombre o código"
+          placeholder="Buscar por nombre, marca o código"
           value={filtro}
           onChange={(e) => setFiltro(e.target.value)}
         />
@@ -154,7 +157,7 @@ function Productos({ empleado }) {
           <List
             height={Math.min(window.innerHeight * 0.55, 420)}
             itemCount={productosFiltrados.length}
-            itemSize={108}
+            itemSize={72}
             width="100%"
             itemData={productosFiltrados}
           >
@@ -165,28 +168,28 @@ function Productos({ empleado }) {
               return (
                 <div style={style} className="productos-list-item">
                   <div
-                    className={`producto-card ${esBajo ? 'stock-bajo' : ''}`}
+                    className={`producto-card producto-card-list ${esBajo ? 'stock-bajo' : ''}`}
                     onClick={() => handleIrAVenta(p)}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => e.key === 'Enter' && handleIrAVenta(p)}
                   >
-                    <h3 className="producto-nombre">{p.nombre}</h3>
-                    {p.codigoBarra && (
-                      <p className="producto-codigo">Código: {p.codigoBarra}</p>
-                    )}
-                    <div className="producto-meta">
-                      <div>
-                        <span className="producto-precio">
-                          ${typeof p.precio === 'number' ? p.precio.toFixed(2) : p.precio}
-                        </span>
-                        <p className="producto-stock">Stock: {p.stock}</p>
-                        {esBajo && (
-                          <span className="badge badge-stock-bajo">Stock bajo</span>
-                        )}
-                      </div>
+                    <div className="producto-card-list-main">
+                      <h3 className="producto-nombre">{getProductLabel(p)}</h3>
+                      {p.codigoBarra && (
+                        <span className="producto-codigo">· {p.codigoBarra}</span>
+                      )}
                     </div>
-                    <p className="badge-action">Tocar para vender</p>
+                    <div className="producto-card-list-meta">
+                      <span className="producto-precio">
+                        ${typeof p.precio === 'number' ? p.precio.toFixed(2) : p.precio}
+                      </span>
+                      <span className="producto-stock">Stock: {p.stock}</span>
+                      {esBajo && (
+                        <span className="badge badge-stock-bajo">Bajo</span>
+                      )}
+                      <span className="badge-action">Vender</span>
+                    </div>
                   </div>
                 </div>
               );

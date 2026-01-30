@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '../constants/routes';
 import { cambiarPin, isOnline } from '../services/api';
 import { getEmpleado, saveEmpleado } from '../services/storage';
 
@@ -43,7 +44,7 @@ function CambiarPin({ empleado, onLogout }) {
         setPinActual('');
         setPinNuevo('');
         setPinRepetir('');
-        setTimeout(() => navigate('/'), 1500);
+        setTimeout(() => navigate(ROUTES.HOME), 1500);
       }
     } catch (err) {
       setError(err.message || 'Error al cambiar el PIN');
@@ -70,7 +71,7 @@ function CambiarPin({ empleado, onLogout }) {
       <header className="vista-header">
         <div className="flex justify-between items-center">
           <h1>Cambiar PIN</h1>
-          <button onClick={() => navigate('/')} className="btn-secondary">
+          <button onClick={() => navigate(ROUTES.HOME)} className="btn-secondary">
             Volver
           </button>
         </div>

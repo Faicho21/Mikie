@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '../constants/routes';
 import { getHistorial, isOnline } from '../services/api';
 
 function ResumenDia({ empleado }) {
@@ -76,7 +77,7 @@ function ResumenDia({ empleado }) {
       <header className="vista-header">
         <div className="flex justify-between items-center">
           <h1>Resumen del día</h1>
-          <button onClick={() => navigate('/')} className="btn-secondary">
+          <button onClick={() => navigate(ROUTES.HOME)} className="btn-secondary">
             Volver
           </button>
         </div>

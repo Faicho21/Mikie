@@ -9,7 +9,8 @@ export default async function productoRoutes(fastify, options) {
       where: {
         OR: [
           { codigoBarra: codigo },
-          { nombre: { contains: codigo } }
+          { nombre: { contains: codigo } },
+          { marca: { contains: codigo } }
         ],
         activo: true
       }
@@ -64,7 +65,7 @@ export default async function productoRoutes(fastify, options) {
 
   // Crear producto
   fastify.post('/', async (request, reply) => {
-    const { nombre, codigoBarra, precio, stock, stockMinimo } = request.body;
+    const { nombre, marca, codigoBarra, precio, stock, stockMinimo } = request.body;
 
     if (!nombre || precio === undefined) {
       return reply.code(400).send({ error: 'Nombre y precio requeridos' });
@@ -74,6 +75,7 @@ export default async function productoRoutes(fastify, options) {
       const producto = await prisma.producto.create({
         data: {
           nombre,
+          marca: marca ? String(marca).trim() || null : null,
           codigoBarra: codigoBarra || null,
           precio: parseFloat(precio),
           stock: stock ? parseInt(stock) : 0,
@@ -93,13 +95,14 @@ export default async function productoRoutes(fastify, options) {
   // Actualizar producto
   fastify.put('/:id', async (request, reply) => {
     const { id } = request.params;
-    const { nombre, codigoBarra, precio, stock, stockMinimo, activo } = request.body;
+    const { nombre, marca, codigoBarra, precio, stock, stockMinimo, activo } = request.body;
 
     try {
       const producto = await prisma.producto.update({
         where: { id: parseInt(id) },
         data: {
           ...(nombre && { nombre }),
+          ...(marca !== undefined && { marca: marca ? String(marca).trim() || null : null }),
           ...(codigoBarra !== undefined && { codigoBarra }),
           ...(precio !== undefined && { precio: parseFloat(precio) }),
           ...(stockMinimo !== undefined && { stockMinimo: parseInt(stockMinimo) }),

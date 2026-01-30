@@ -23,6 +23,7 @@ model Empleado {
 model Producto {
   id           Int      @id @default(autoincrement())
   nombre       String
+  marca        String?  // Ej: "Villa del sur" para diferenciar productos iguales
   codigoBarra  String?  @unique // Código de barras (EAN/UPC)
   precio       Float
   stock        Int      @default(0)

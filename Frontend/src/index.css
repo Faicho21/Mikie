@@ -1246,7 +1246,91 @@ textarea {
 }
 
 .productos-list-item {
-  padding-bottom: 8px;
+  padding-bottom: 6px;
+}
+
+/* Cards compactas en listado de productos: layout horizontal */
+.producto-card-list {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 0;
+  min-height: 0;
+}
+
+.producto-card-list .producto-card-list-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.producto-card-list .producto-nombre {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 0;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.producto-card-list .producto-codigo {
+  font-size: 12px;
+  margin-bottom: 0;
+  flex-shrink: 0;
+  color: var(--gray-muted);
+}
+
+.producto-card-list .producto-card-list-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.producto-card-list .producto-precio {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.producto-card-list .producto-stock {
+  font-size: 13px;
+  margin: 0;
+}
+
+.producto-card-list .badge-stock-bajo {
+  margin-top: 0;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.producto-card-list .badge-action {
+  font-size: 11px;
+  margin-top: 0;
+  color: var(--green-accent);
+}
+
+@media (max-width: 480px) {
+  .producto-card-list {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .producto-card-list .producto-nombre {
+    font-size: 14px;
+  }
+  .producto-card-list .producto-precio {
+    font-size: 15px;
+  }
+  .producto-card-list .producto-card-list-meta {
+    gap: 6px;
+  }
 }
 
 /* Lista virtualizada (Reponer) */

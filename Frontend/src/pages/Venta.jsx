@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { ROUTES } from '../constants/routes';
 import {
   buscarProducto,
   registrarVentas,
@@ -10,6 +11,7 @@ import {
   getProductoFromCache,
   getAllProductosFromCache
 } from '../services/storage';
+import { getProductLabel } from '../utils/producto';
 import EscanerCodigo from '../components/EscanerCodigo';
 
 function Venta({ empleado }) {
@@ -79,7 +81,8 @@ function Venta({ empleado }) {
           productoEncontrado = productos.find(
             (p) =>
               p.codigoBarra === codigo ||
-              p.nombre.toLowerCase().includes(codigo.toLowerCase())
+              (p.nombre && p.nombre.toLowerCase().includes(codigo.toLowerCase())) ||
+              (p.marca && p.marca.toLowerCase().includes(codigo.toLowerCase()))
           );
         }
       }
@@ -208,7 +211,7 @@ function Venta({ empleado }) {
       setBusqueda('');
       setError('');
       setEsperandoFormaPago(false);
-      navigate('/');
+      navigate(ROUTES.HOME);
     } catch (err) {
       setError(err.message || 'Error al registrar venta');
     } finally {
@@ -220,14 +223,14 @@ function Venta({ empleado }) {
     if (carrito.length > 0 && !window.confirm('Hay productos en el carrito. ¿Salir igual? Se perderá la venta.')) {
       return;
     }
-    navigate('/');
+    navigate(ROUTES.HOME);
   };
 
   const handleVolver = () => {
     if (carrito.length > 0 && !window.confirm('Hay productos en el carrito. ¿Salir igual? Se perderá la venta.')) {
       return;
     }
-    navigate('/');
+    navigate(ROUTES.HOME);
   };
 
   if (loading && !productoActual && carrito.length === 0 && !esperandoFormaPago) {
@@ -345,7 +348,7 @@ function Venta({ empleado }) {
 
       {productoActual && (
         <div className="venta-producto-card">
-          <h3 className="font-bold mb-2">{productoActual.nombre}</h3>
+          <h3 className="font-bold mb-2">{getProductLabel(productoActual)}</h3>
           {productoActual.codigoBarra && (
             <p className="text-muted text-sm mb-2">Código: {productoActual.codigoBarra}</p>
           )}
@@ -402,7 +405,7 @@ function Venta({ empleado }) {
             {carrito.map((item, index) => (
               <div key={`resumen-${item.producto.id}-${index}`} className="venta-resumen-item">
                 <div className="venta-resumen-item-content">
-                  <span className="venta-resumen-nombre">{item.producto.nombre}</span>
+                  <span className="venta-resumen-nombre">{getProductLabel(item.producto)}</span>
                   <div className="venta-resumen-cant-editor">
                     <button
                       type="button"
@@ -447,7 +450,7 @@ function Venta({ empleado }) {
 
           <button
             type="button"
-            onClick={() => navigate('/productos', { state: { carritoDesdeVenta: carrito } })}
+            onClick={() => navigate(ROUTES.PRODUCTOS, { state: { carritoDesdeVenta: carrito } })}
             className="btn-secondary"
             style={{ marginBottom: '16px', width: '100%' }}
           >

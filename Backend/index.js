@@ -1,13 +1,8 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import prisma from './db.js';
-import dotenv from 'dotenv';
-import empleadoRoutes from './routes/empleado.js';
-import productoRoutes from './routes/producto.js';
-import movimientoRoutes from './routes/movimiento.js';
-import syncRoutes from './routes/sync.js';
-
-dotenv.config();
+import { config } from './config/index.js';
+import { routes } from './routes/index.js';
 
 const fastify = Fastify({ logger: true });
 
@@ -32,18 +27,16 @@ fastify.get('/health', async (request, reply) => {
   return { status: 'ok', timestamp: new Date().toISOString() };
 });
 
-// Registrar rutas
-await fastify.register(empleadoRoutes, { prefix: '/api/empleados' });
-await fastify.register(productoRoutes, { prefix: '/api/productos' });
-await fastify.register(movimientoRoutes, { prefix: '/api/movimientos' });
-await fastify.register(syncRoutes, { prefix: '/api/sync' });
+// Registrar rutas (modular)
+for (const { plugin, prefix } of routes) {
+  await fastify.register(plugin, { prefix });
+}
 
 // Iniciar servidor
 const start = async () => {
   try {
-    const port = process.env.PORT || 3000;
-    await fastify.listen({ port, host: '0.0.0.0' });
-    console.log(`🚀 Backend corriendo en http://localhost:${port}`);
+    await fastify.listen({ port: config.port, host: config.host });
+    console.log(`🚀 Backend corriendo en http://localhost:${config.port}`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

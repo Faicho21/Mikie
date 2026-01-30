@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { ROUTES } from '../constants/routes';
 import { isOnline, getHistorial } from '../services/api';
 import { getMovimientosPendientes } from '../services/storage';
 
@@ -116,7 +117,7 @@ function Home({ empleado, onLogout }) {
 
       <section className="vista-card home-actions">
         <button
-          onClick={() => navigate('/venta')}
+          onClick={() => navigate(ROUTES.VENTA)}
           className="btn-primary w-full"
         >
           Nueva venta
@@ -125,31 +126,31 @@ function Home({ empleado, onLogout }) {
 
       <section className="vista-card home-nav">
         <button
-          onClick={() => navigate('/productos')}
+          onClick={() => navigate(ROUTES.PRODUCTOS)}
           className="btn-secondary w-full"
         >
           Listado de Productos
         </button>
         <button
-          onClick={() => navigate('/reponer')}
+          onClick={() => navigate(ROUTES.REPONER)}
           className="btn-secondary w-full"
         >
           Reponer Stock
         </button>
         <button
-          onClick={() => navigate('/historial')}
+          onClick={() => navigate(ROUTES.HISTORIAL)}
           className="btn-secondary w-full"
         >
           Ver Historial
         </button>
         <button
-          onClick={() => navigate('/resumen-dia')}
+          onClick={() => navigate(ROUTES.RESUMEN_DIA)}
           className="btn-secondary w-full"
         >
           Resumen del día
         </button>
         <button
-          onClick={() => navigate('/cambiar-pin')}
+          onClick={() => navigate(ROUTES.CAMBIAR_PIN)}
           className="btn-secondary w-full"
         >
           Cambiar PIN

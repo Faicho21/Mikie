@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { ROUTES } from './constants/routes';
 import Login from './pages/Login';
 import Home from './pages/Home';
 import Venta from './pages/Venta';
@@ -71,82 +72,82 @@ function App() {
   return (
     <Routes>
       <Route
-        path="/login"
+        path={ROUTES.LOGIN}
         element={
           empleado ? (
-            <Navigate to="/" replace />
+            <Navigate to={ROUTES.HOME} replace />
           ) : (
             <Login onLogin={handleLogin} />
           )
         }
       />
       <Route
-        path="/"
+        path={ROUTES.HOME}
         element={
           empleado ? (
             <Home empleado={empleado} onLogout={handleLogout} />
           ) : (
-            <Navigate to="/login" replace />
+            <Navigate to={ROUTES.LOGIN} replace />
           )
         }
       />
       <Route
-        path="/venta/:productoId?"
+        path={`${ROUTES.VENTA}/:productoId?`}
         element={
           empleado ? (
             <Venta empleado={empleado} />
           ) : (
-            <Navigate to="/login" replace />
+            <Navigate to={ROUTES.LOGIN} replace />
           )
         }
       />
       <Route
-        path="/historial"
+        path={ROUTES.HISTORIAL}
         element={
           empleado ? (
             <Historial empleado={empleado} />
           ) : (
-            <Navigate to="/login" replace />
+            <Navigate to={ROUTES.LOGIN} replace />
           )
         }
       />
       <Route
-        path="/productos"
+        path={ROUTES.PRODUCTOS}
         element={
           empleado ? (
             <Productos empleado={empleado} />
           ) : (
-            <Navigate to="/login" replace />
+            <Navigate to={ROUTES.LOGIN} replace />
           )
         }
       />
       <Route
-        path="/reponer"
+        path={ROUTES.REPONER}
         element={
           empleado ? (
             <Reponer empleado={empleado} />
           ) : (
-            <Navigate to="/login" replace />
+            <Navigate to={ROUTES.LOGIN} replace />
           )
         }
       />
       <Route
-        path="/resumen-dia"
+        path={ROUTES.RESUMEN_DIA}
         element={
           empleado ? (
             <ResumenDia empleado={empleado} />
           ) : (
-            <Navigate to="/login" replace />
+            <Navigate to={ROUTES.LOGIN} replace />
           )
         }
       />
       <Route
-        path="/cambiar-pin"
+        path={ROUTES.CAMBIAR_PIN}
         element={
           empleado ? (
             <CambiarPin empleado={empleado} onLogout={handleLogout} />
           ) : (
-            <Navigate to="/login" replace />
+            <Navigate to={ROUTES.LOGIN} replace />
           )
         }
       />

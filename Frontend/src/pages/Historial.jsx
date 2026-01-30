@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FixedSizeList as List } from 'react-window';
+import { ROUTES } from '../constants/routes';
 import { getHistorial, isOnline } from '../services/api';
+import { getProductLabel } from '../utils/producto';
 
 const PAGE_SIZE = 30;
 
@@ -72,7 +74,7 @@ function Historial({ empleado }) {
       <header className="vista-header">
         <div className="flex justify-between items-center">
           <h1>Historial de Ventas</h1>
-          <button onClick={() => navigate('/')} className="btn-secondary">
+          <button onClick={() => navigate(ROUTES.HOME)} className="btn-secondary">
             Volver
           </button>
         </div>
@@ -114,7 +116,7 @@ function Historial({ empleado }) {
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <h3 className="font-bold" style={{ fontSize: '16px', marginBottom: '4px' }}>{mov.producto?.nombre}</h3>
+                        <h3 className="font-bold" style={{ fontSize: '16px', marginBottom: '4px' }}>{getProductLabel(mov.producto)}</h3>
                         <p className="text-sm text-muted">{formatearFecha(mov.fecha)}</p>
                       </div>
                       <div style={{ textAlign: 'right' }}>
