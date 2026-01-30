@@ -88,15 +88,18 @@ export const saveMovimientoOffline = async (movimiento) => {
 };
 
 // Obtener movimientos pendientes de sincronizar
+// IndexedDB no acepta boolean como clave válida en getAll(key), por eso filtramos en JS
 export const getMovimientosPendientes = async () => {
   const database = await initDB();
   const transaction = database.transaction([STORE_MOVIMIENTOS], 'readonly');
   const store = transaction.objectStore(STORE_MOVIMIENTOS);
-  const index = store.index('sincronizado');
 
   return new Promise((resolve, reject) => {
-    const request = index.getAll(false);
-    request.onsuccess = () => resolve(request.result);
+    const request = store.getAll();
+    request.onsuccess = () => {
+      const todos = request.result || [];
+      resolve(todos.filter((mov) => mov.sincronizado === false));
+    };
     request.onerror = () => reject(request.error);
   });
 };

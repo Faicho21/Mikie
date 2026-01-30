@@ -41,6 +41,7 @@ model MovimientoStock {
   cantidad   Int      // Positivo para venta, negativo para reposición
   tipo       String   // "venta" | "reposicion" | "ajuste"
   fecha      DateTime @default(now())
+  formaPago  String?  // "efectivo" | "transferencia" (solo para ventas)
   
   empleado   Empleado @relation(fields: [empleadoId], references: [id])
   producto   Producto @relation(fields: [productoId], references: [id])

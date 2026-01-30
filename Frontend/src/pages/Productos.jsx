@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { FixedSizeList as List } from 'react-window';
 import { getAllProductos, isOnline } from '../services/api';
 import { getAllProductosFromCache } from '../services/storage';
 
@@ -148,39 +149,51 @@ function Productos({ empleado }) {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-        {productosFiltrados.map((p) => {
-          const minimo = p.stockMinimo != null ? p.stockMinimo : 0;
-          const esBajo = p.stock <= minimo;
-          return (
-            <div
-              key={p.id}
-              className={`producto-card ${esBajo ? 'stock-bajo' : ''}`}
-              onClick={() => handleIrAVenta(p)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && handleIrAVenta(p)}
-            >
-              <h3 className="producto-nombre">{p.nombre}</h3>
-              {p.codigoBarra && (
-                <p className="producto-codigo">Código: {p.codigoBarra}</p>
-              )}
-              <div className="producto-meta">
-                <div>
-                  <span className="producto-precio">
-                    ${typeof p.precio === 'number' ? p.precio.toFixed(2) : p.precio}
-                  </span>
-                  <p className="producto-stock">Stock: {p.stock}</p>
-                  {esBajo && (
-                    <span className="badge badge-stock-bajo">Stock bajo</span>
-                  )}
+      {productosFiltrados.length > 0 && (
+        <div className="productos-list-container">
+          <List
+            height={Math.min(window.innerHeight * 0.55, 420)}
+            itemCount={productosFiltrados.length}
+            itemSize={108}
+            width="100%"
+            itemData={productosFiltrados}
+          >
+            {({ index, style, data }) => {
+              const p = data[index];
+              const minimo = p.stockMinimo != null ? p.stockMinimo : 0;
+              const esBajo = p.stock <= minimo;
+              return (
+                <div style={style} className="productos-list-item">
+                  <div
+                    className={`producto-card ${esBajo ? 'stock-bajo' : ''}`}
+                    onClick={() => handleIrAVenta(p)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => e.key === 'Enter' && handleIrAVenta(p)}
+                  >
+                    <h3 className="producto-nombre">{p.nombre}</h3>
+                    {p.codigoBarra && (
+                      <p className="producto-codigo">Código: {p.codigoBarra}</p>
+                    )}
+                    <div className="producto-meta">
+                      <div>
+                        <span className="producto-precio">
+                          ${typeof p.precio === 'number' ? p.precio.toFixed(2) : p.precio}
+                        </span>
+                        <p className="producto-stock">Stock: {p.stock}</p>
+                        {esBajo && (
+                          <span className="badge badge-stock-bajo">Stock bajo</span>
+                        )}
+                      </div>
+                    </div>
+                    <p className="badge-action">Tocar para vender</p>
+                  </div>
                 </div>
-              </div>
-              <p className="badge-action">Tocar para vender</p>
-            </div>
-          );
-        })}
-      </div>
+              );
+            }}
+          </List>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,7 +9,7 @@ export default async function productoRoutes(fastify, options) {
       where: {
         OR: [
           { codigoBarra: codigo },
-          { nombre: { contains: codigo, mode: 'insensitive' } }
+          { nombre: { contains: codigo } }
         ],
         activo: true
       }
@@ -22,21 +22,29 @@ export default async function productoRoutes(fastify, options) {
     return { producto };
   });
 
-  // Obtener todos los productos
+  // Obtener productos (paginado opcional: limit, offset; si no se envían, devuelve todos)
   fastify.get('/', async (request, reply) => {
-    const { activo } = request.query;
-    
+    const { activo, limit, offset } = request.query;
+
     const where = {};
     if (activo !== undefined) {
       where.activo = activo === 'true';
     }
 
-    const productos = await prisma.producto.findMany({
-      where,
-      orderBy: { nombre: 'asc' }
-    });
+    const hasPagination = limit != null && limit !== '';
+    const take = hasPagination ? Math.min(Math.max(1, parseInt(limit) || 50), 200) : undefined;
+    const skip = hasPagination && offset != null && offset !== '' ? Math.max(0, parseInt(offset)) : 0;
 
-    return { productos };
+    const [total, productos] = await Promise.all([
+      prisma.producto.count({ where }),
+      prisma.producto.findMany({
+        where,
+        orderBy: { nombre: 'asc' },
+        ...(take != null && { take, skip })
+      })
+    ]);
+
+    return hasPagination ? { productos, total } : { productos, total };
   });
 
   // Obtener producto por ID
@@ -112,14 +120,18 @@ export default async function productoRoutes(fastify, options) {
   // Eliminar producto (soft delete)
   fastify.delete('/:id', async (request, reply) => {
     const { id } = request.params;
+    const idNum = parseInt(id, 10);
+    if (isNaN(idNum) || idNum < 1) {
+      return reply.code(400).send({ error: 'ID de producto inválido' });
+    }
 
     try {
       const producto = await prisma.producto.update({
-        where: { id: parseInt(id) },
+        where: { id: idNum },
         data: { activo: false }
       });
 
-      return { producto };
+      return reply.send({ producto });
     } catch (error) {
       if (error.code === 'P2025') {
         return reply.code(404).send({ error: 'Producto no encontrado' });

@@ -10,6 +10,7 @@ import {
   getProductoFromCache,
   getAllProductosFromCache
 } from '../services/storage';
+import EscanerCodigo from '../components/EscanerCodigo';
 
 function Venta({ empleado }) {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ function Venta({ empleado }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const codigoParam = searchParams.get('codigo');
 
+  const [mostrarEscaner, setMostrarEscaner] = useState(false);
   const [carrito, setCarrito] = useState(() => {
     const previo = location.state?.carritoPrevio;
     return Array.isArray(previo) ? previo : [];
@@ -27,7 +29,7 @@ function Venta({ empleado }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [online, setOnline] = useState(true);
-  const [ventaRealizada, setVentaRealizada] = useState(null);
+  const [esperandoFormaPago, setEsperandoFormaPago] = useState(false);
   const [toast, setToast] = useState('');
 
   useEffect(() => {
@@ -157,7 +159,13 @@ function Venta({ empleado }) {
     0
   );
 
-  const handleConfirmarVenta = async () => {
+  const handleConfirmarVenta = () => {
+    if (carrito.length === 0) return;
+    setError('');
+    setEsperandoFormaPago(true);
+  };
+
+  const handleRegistrarConFormaPago = async (formaPago) => {
     if (carrito.length === 0) return;
     setLoading(true);
     setError('');
@@ -168,10 +176,9 @@ function Venta({ empleado }) {
     }));
 
     try {
-      const totalVenta = totalCarrito;
       if (isOnline()) {
         try {
-          await registrarVentas(empleado.id, items);
+          await registrarVentas(empleado.id, items, formaPago);
         } catch (err) {
           for (const item of carrito) {
             await saveMovimientoOffline({
@@ -179,6 +186,7 @@ function Venta({ empleado }) {
               productoId: item.producto.id,
               cantidad: item.cantidad,
               tipo: 'venta',
+              formaPago,
               fecha: new Date().toISOString()
             });
           }
@@ -190,15 +198,17 @@ function Venta({ empleado }) {
             productoId: item.producto.id,
             cantidad: item.cantidad,
             tipo: 'venta',
+            formaPago,
             fecha: new Date().toISOString()
           });
         }
       }
-      setVentaRealizada({ total: totalVenta });
       setCarrito([]);
       setProductoActual(null);
       setBusqueda('');
       setError('');
+      setEsperandoFormaPago(false);
+      navigate('/');
     } catch (err) {
       setError(err.message || 'Error al registrar venta');
     } finally {
@@ -220,16 +230,7 @@ function Venta({ empleado }) {
     navigate('/');
   };
 
-  const realizarNuevaVenta = () => {
-    setVentaRealizada(null);
-    setCarrito([]);
-    setProductoActual(null);
-    setBusqueda('');
-    setError('');
-    setSearchParams({});
-  };
-
-  if (loading && !productoActual && carrito.length === 0 && !ventaRealizada) {
+  if (loading && !productoActual && carrito.length === 0 && !esperandoFormaPago) {
     return (
       <div className="container vista-page" style={{ paddingTop: '50%', textAlign: 'center' }}>
         <p className="text-muted">Buscando producto...</p>
@@ -237,35 +238,63 @@ function Venta({ empleado }) {
     );
   }
 
-  if (ventaRealizada) {
+  if (esperandoFormaPago) {
     return (
       <div className="container vista-page">
         <header className="vista-header">
           <div className="flex justify-between items-center">
             <h1>Venta</h1>
-            <button onClick={() => navigate('/')} className="btn-secondary">
+            <button onClick={() => setEsperandoFormaPago(false)} className="btn-secondary">
               Volver
             </button>
           </div>
         </header>
         <div className="vista-card venta-exito-card">
-          <p className="total-label">Venta realizada</p>
-          <p className="total-monto">${ventaRealizada.total.toFixed(2)}</p>
-          <button
-            type="button"
-            onClick={realizarNuevaVenta}
-            className="btn-primary w-full"
-            style={{ padding: '16px', fontSize: '18px' }}
-          >
-            Realizar nueva venta
-          </button>
+          <p className="total-label">Total a cobrar</p>
+          <p className="total-monto">${totalCarrito.toFixed(2)}</p>
+          <p className="font-bold mb-3" style={{ color: 'var(--green-dark)', marginTop: '20px' }}>
+            ¿Cómo se abona?
+          </p>
+          {error && <div className="vista-card alert-error mb-3">{error}</div>}
+          <div className="flex gap-3" style={{ flexDirection: 'column' }}>
+            <button
+              type="button"
+              onClick={() => handleRegistrarConFormaPago('efectivo')}
+              className="btn-primary"
+              style={{ padding: '16px', fontSize: '17px' }}
+              disabled={loading}
+            >
+              Efectivo
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRegistrarConFormaPago('transferencia')}
+              className="btn-secondary"
+              style={{ padding: '16px', fontSize: '17px' }}
+              disabled={loading}
+            >
+              Transferencia
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
+  if (mostrarEscaner) {
+    return (
+      <EscanerCodigo
+        onCodigoEscaneado={(codigo) => {
+          setMostrarEscaner(false);
+          setSearchParams({ codigo });
+        }}
+        onCancelar={() => setMostrarEscaner(false)}
+      />
+    );
+  }
+
   return (
-    <div className="container vista-page">
+    <div className="container vista-page venta-page">
       <header className="vista-header">
         <div className="flex justify-between items-center">
           <h1>Venta</h1>
@@ -275,12 +304,17 @@ function Venta({ empleado }) {
         </div>
       </header>
 
+      <section className="venta-welcome">
+        <p className="venta-welcome-text">
+          Buscá el producto por código de barras o por nombre para agregarlo al carrito.
+        </p>
+      </section>
+
       <section className="venta-buscar">
-        <h3 className="font-bold" style={{ marginBottom: '12px', color: 'var(--green-dark)' }}>Agregar producto</h3>
         <div className="flex gap-2">
           <input
             type="text"
-            placeholder={carrito.length > 0 ? 'Código o nombre del próximo producto' : 'Código o nombre'}
+            placeholder={carrito.length > 0 ? 'Código o nombre del próximo producto' : 'Código o nombre del producto'}
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             onKeyDown={(e) => {
@@ -289,6 +323,7 @@ function Venta({ empleado }) {
                 buscarProductoPorCodigo(busqueda);
               }
             }}
+            className="venta-buscar-input"
             style={{ flex: 1 }}
           />
           <button
@@ -299,6 +334,13 @@ function Venta({ empleado }) {
             Buscar
           </button>
         </div>
+        <button
+          type="button"
+          onClick={() => setMostrarEscaner(true)}
+          className="venta-escanear-btn"
+        >
+          Escanear código de barras
+        </button>
       </section>
 
       {productoActual && (
@@ -440,8 +482,8 @@ function Venta({ empleado }) {
       )}
 
       {carrito.length === 0 && !productoActual && !loading && (
-        <div className="vista-empty">
-          Buscá un producto por código o nombre y agregalo al carrito. Podés sumar varios antes de confirmar la venta.
+        <div className="vista-empty venta-empty">
+          <p>Podés sumar varios productos al carrito antes de confirmar la venta.</p>
         </div>
       )}
 

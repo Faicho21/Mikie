@@ -6,7 +6,8 @@ function EscanerCodigo({ onCodigoEscaneado, onCancelar }) {
   const html5QrCodeRef = useRef(null);
   const [error, setError] = useState('');
   const [codigoManual, setCodigoManual] = useState('');
-  const [soloManual, setSoloManual] = useState(true);
+  const [soloManual, setSoloManual] = useState(false); // Cámara por defecto
+  const [camaraLista, setCamaraLista] = useState(false);
 
   const enviarCodigoManual = () => {
     const codigo = codigoManual.trim();
@@ -36,30 +37,51 @@ function EscanerCodigo({ onCodigoEscaneado, onCancelar }) {
         html5QrCodeRef.current = null;
       }
       setError('');
+      setCamaraLista(false);
       return;
     }
 
+    setCamaraLista(false);
+    setError('');
+
     const initScanner = async () => {
       try {
-        const html5QrCode = new Html5Qrcode('scanner-container');
-        html5QrCodeRef.current = html5QrCode;
-
-        const config = {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0
-        };
-
-        const cameras = await Html5Qrcode.getCameras();
-        if (cameras.length === 0) {
-          setError('No se encontr? ninguna c?mara');
+        const container = document.getElementById('scanner-container');
+        if (!container) {
+          setError('No se pudo cargar el visor de la cámara');
           return;
         }
 
-        const cameraId = cameras.length > 1 ? cameras[cameras.length - 1].id : cameras[0].id;
+        // Sin formatsToSupport = escanea todos los formatos. Sin qrbox = usa toda la imagen (mejor para barras).
+        const html5QrCode = new Html5Qrcode('scanner-container', {
+          useBarCodeDetectorIfSupported: false,
+          verbose: false
+        });
+        html5QrCodeRef.current = html5QrCode;
+
+        const cameras = await Html5Qrcode.getCameras();
+        if (cameras.length === 0) {
+          setError('No se encontró ninguna cámara');
+          return;
+        }
+
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const config = {
+          fps: 20,
+          aspectRatio: isMobile ? 1.333 : 1.0
+          // Sin qrbox: escanea todo el frame (más chances de leer el código de barras)
+        };
+
+        // En móvil usar facingMode para cámara trasera (evita pantalla negra por conflicto cameraId + constraints)
+        const cameraIdOrConstraints = isMobile
+          ? { facingMode: 'environment' }
+          : (() => {
+              const back = cameras.find((c) => /back|environment|trasera/i.test(c.label || ''));
+              return back ? back.id : cameras[cameras.length - 1]?.id || cameras[0].id;
+            })();
 
         await html5QrCode.start(
-          cameraId,
+          cameraIdOrConstraints,
           config,
           (decodedText) => {
             if (navigator.vibrate) navigator.vibrate(100);
@@ -76,26 +98,30 @@ function EscanerCodigo({ onCodigoEscaneado, onCancelar }) {
               oscillator.start(audioContext.currentTime);
               oscillator.stop(audioContext.currentTime + 0.1);
             } catch (_) {}
-            html5QrCode.stop().then(() => {
-              onCodigoEscaneado(decodedText);
-            }).catch(() => {
-              onCodigoEscaneado(decodedText);
-            });
+            onCodigoEscaneado(decodedText);
+            // No llamar stop() aquí: el cleanup del useEffect lo hace al desmontar. Evita "Cannot stop, scanner is not running".
           },
           () => {}
         );
+        setCamaraLista(true);
       } catch (err) {
-        setError(err.message || 'Error al iniciar el esc?ner');
-        console.error('Error en esc?ner:', err);
+        const msg = err.name === 'NotAllowedError' || err.message?.includes('Permission')
+          ? 'Permiso de cámara denegado. Permití el acceso en la configuración del navegador.'
+          : err.message || 'Error al iniciar la cámara';
+        setError(msg);
+        console.error('Error en escáner:', err);
       }
     };
 
-    initScanner();
+    // Iniciar la cámara después de que el contenedor esté en el DOM y con tamaño
+    const timer = setTimeout(() => initScanner(), 150);
 
     return () => {
+      clearTimeout(timer);
       if (html5QrCodeRef.current) {
         html5QrCodeRef.current.stop().catch(() => {});
       }
+      setCamaraLista(false);
     };
   }, [onCodigoEscaneado, soloManual]);
 
@@ -111,7 +137,7 @@ function EscanerCodigo({ onCodigoEscaneado, onCancelar }) {
         alignItems: 'center',
         flexShrink: 0
       }}>
-        <h2 style={{ margin: 0, fontSize: '18px' }}>Nueva venta</h2>
+        <h2 style={{ margin: 0, fontSize: '18px' }}>Escanear código</h2>
         <button
           onClick={onCancelar}
           style={{
@@ -128,91 +154,86 @@ function EscanerCodigo({ onCodigoEscaneado, onCancelar }) {
         </button>
       </div>
 
-      {/* Entrada manual siempre visible arriba */}
-      <div style={{ 
-        padding: '16px', 
-        background: 'rgba(20,83,45,0.2)', 
-        color: 'white',
-        fontSize: '14px',
-        flexShrink: 0,
-        borderBottom: '1px solid rgba(255,255,255,0.1)'
-      }}>
-        <p style={{ margin: '0 0 12px', fontWeight: 600 }}>Ingresar c?digo manualmente</p>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <input
-            type="text"
-            value={codigoManual}
-            onChange={(e) => setCodigoManual(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && enviarCodigoManual()}
-            placeholder="C?digo de barras"
-            autoComplete="off"
-            autoFocus
-            style={{
-              flex: 1,
-              minWidth: '140px',
-              padding: '10px 12px',
-              fontSize: '16px',
-              border: '1px solid rgba(255,255,255,0.3)',
-              borderRadius: '8px',
-              background: 'rgba(255,255,255,0.1)',
-              color: 'white'
-            }}
-          />
-          <button
-            type="button"
-            onClick={enviarCodigoManual}
-            disabled={!codigoManual.trim()}
-            style={{
-              background: '#14532d',
-              color: 'white',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '8px',
-              cursor: codigoManual.trim() ? 'pointer' : 'not-allowed',
-              fontSize: '14px',
-              opacity: codigoManual.trim() ? 1 : 0.6
-            }}
-          >
-            Buscar
-          </button>
-        </div>
-        <button
-          type="button"
-          onClick={() => setSoloManual(!soloManual)}
-          style={{
-            marginTop: '12px',
-            background: 'transparent',
-            color: 'rgba(255,255,255,0.8)',
-            border: '1px solid rgba(255,255,255,0.3)',
-            padding: '6px 12px',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '13px'
-          }}
-        >
-          {soloManual ? 'Mostrar esc?ner de c?mara' : 'Ocultar esc?ner (solo teclado)'}
-        </button>
-      </div>
-
-      {/* ?rea del esc?ner: solo si no est? en modo solo manual */}
-      {!soloManual && (
+      {/* C?mara o entrada manual */}
+      {!soloManual ? (
         <>
           <div 
             id="scanner-container" 
             ref={scannerRef}
-            style={{ 
-              minHeight: '200px',
-              maxHeight: '40vh',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              flexShrink: 0
-            }}
+            className="escaner-camera-area"
           />
-          <p style={{ margin: '8px 16px', color: 'rgba(255,255,255,0.7)', fontSize: '13px', textAlign: 'center' }}>
-            Apunt? la c?mara al c?digo de barras
-          </p>
+          {!camaraLista && !error && (
+            <p className="escaner-msg">Iniciando c?mara?</p>
+          )}
+          {camaraLista && (
+            <p className="escaner-msg">Enfocá el código de barras en pantalla y mantenelo quieto un momento</p>
+          )}
+          <button
+            type="button"
+            onClick={() => setSoloManual(true)}
+            className="escaner-toggle-btn"
+          >
+            Ingresar código manualmente
+          </button>
         </>
+      ) : (
+        <div className="escaner-manual-block">
+          <p style={{ margin: '0 0 12px', fontWeight: 600 }}>Ingresar código manualmente</p>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <input
+              type="text"
+              value={codigoManual}
+              onChange={(e) => setCodigoManual(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && enviarCodigoManual()}
+              placeholder="Código de barras"
+              autoComplete="off"
+              autoFocus
+              style={{
+                flex: 1,
+                minWidth: '140px',
+                padding: '10px 12px',
+                fontSize: '16px',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: '8px',
+                background: 'rgba(255,255,255,0.1)',
+                color: 'white'
+              }}
+            />
+            <button
+              type="button"
+              onClick={enviarCodigoManual}
+              disabled={!codigoManual.trim()}
+              style={{
+                background: '#14532d',
+                color: 'white',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '8px',
+                cursor: codigoManual.trim() ? 'pointer' : 'not-allowed',
+                fontSize: '14px',
+                opacity: codigoManual.trim() ? 1 : 0.6
+              }}
+            >
+              Buscar
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSoloManual(false)}
+            style={{
+              marginTop: '12px',
+              background: 'transparent',
+              color: 'rgba(255,255,255,0.8)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '13px'
+            }}
+          >
+            Usar cámara
+          </button>
+        </div>
       )}
 
       {error && (

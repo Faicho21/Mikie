@@ -6,8 +6,7 @@ function ResumenDia({ empleado }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [totalVentas, setTotalVentas] = useState(null);
-  const [cantidadVentas, setCantidadVentas] = useState(null);
+  const [resumen, setResumen] = useState(null);
 
   useEffect(() => {
     const cargar = async () => {
@@ -31,17 +30,30 @@ function ResumenDia({ empleado }) {
           limit: '1000'
         });
         const movs = res.movimientos || [];
-        const total = movs.reduce(
-          (sum, mov) => sum + (mov.producto?.precio || 0) * Math.abs(mov.cantidad || 0),
-          0
-        );
-        setTotalVentas(total);
+        let total = 0;
+        let efectivo = 0;
+        let transferencia = 0;
+        let itemsVendidos = 0;
         const porMinuto = {};
         movs.forEach((m) => {
+          const monto = (m.producto?.precio || 0) * Math.abs(m.cantidad || 0);
+          total += monto;
+          if (m.formaPago === 'efectivo') efectivo += monto;
+          else if (m.formaPago === 'transferencia') transferencia += monto;
+          itemsVendidos += Math.abs(m.cantidad || 0);
           const key = m.fecha ? Math.floor(new Date(m.fecha).getTime() / 60000) : 0;
           porMinuto[key] = true;
         });
-        setCantidadVentas(Object.keys(porMinuto).length);
+        const cantidadTransacciones = Object.keys(porMinuto).length;
+        const promedioTransaccion = cantidadTransacciones > 0 ? total / cantidadTransacciones : 0;
+        setResumen({
+          total,
+          efectivo,
+          transferencia,
+          cantidadTransacciones,
+          itemsVendidos,
+          promedioTransaccion
+        });
       } catch (err) {
         setError(err.message || 'Error al cargar resumen');
       } finally {
@@ -76,16 +88,34 @@ function ResumenDia({ empleado }) {
         </div>
       )}
 
-      {!error && (
-        <div className="vista-card" style={{ textAlign: 'center', padding: '28px' }}>
-          <p className="text-muted mb-2">Total vendido hoy</p>
-          <p className="font-bold" style={{ fontSize: '28px', color: 'var(--green)', marginBottom: '24px' }}>
-            ${totalVentas != null ? totalVentas.toFixed(2) : '0.00'}
-          </p>
-          <p className="text-muted mb-1">Cantidad de ventas</p>
-          <p className="font-bold" style={{ fontSize: '22px', color: 'var(--green-dark)' }}>
-            {cantidadVentas != null ? cantidadVentas : 0}
-          </p>
+      {!error && resumen && (
+        <div className="resumen-dia-cards">
+          <div className="vista-card resumen-dia-total">
+            <p className="text-muted mb-1">Total vendido hoy</p>
+            <p className="font-bold resumen-dia-monto">
+              ${resumen.total.toFixed(2)}
+            </p>
+          </div>
+          <div className="vista-card resumen-dia-linea">
+            <span className="text-muted">Efectivo</span>
+            <span className="font-bold">${resumen.efectivo.toFixed(2)}</span>
+          </div>
+          <div className="vista-card resumen-dia-linea">
+            <span className="text-muted">Transferencia</span>
+            <span className="font-bold">${resumen.transferencia.toFixed(2)}</span>
+          </div>
+          <div className="vista-card resumen-dia-linea">
+            <span className="text-muted">Transacciones</span>
+            <span className="font-bold">{resumen.cantidadTransacciones}</span>
+          </div>
+          <div className="vista-card resumen-dia-linea">
+            <span className="text-muted">Ítems vendidos</span>
+            <span className="font-bold">{resumen.itemsVendidos}</span>
+          </div>
+          <div className="vista-card resumen-dia-linea">
+            <span className="text-muted">Promedio por transacción</span>
+            <span className="font-bold">${resumen.promedioTransaccion.toFixed(2)}</span>
+          </div>
         </div>
       )}
     </div>

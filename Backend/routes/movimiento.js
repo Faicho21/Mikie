@@ -82,12 +82,18 @@ export default async function movimientoRoutes(fastify, options) {
   // Registrar venta de múltiples productos (carrito)
   fastify.post('/ventas', async (request, reply) => {
     const { empleadoId, items } = request.body;
+    const formaPago = request.body.formaPago;
 
     if (!empleadoId || !Array.isArray(items) || items.length === 0) {
       return reply.code(400).send({
         error: 'empleadoId e items (array de { productoId, cantidad }) requeridos'
       });
     }
+    const formaPagoValida = (typeof formaPago === 'string' && (formaPago === 'efectivo' || formaPago === 'transferencia'))
+      ? formaPago
+      : null;
+
+    request.log.info({ formaPagoRecibido: formaPago, formaPagoValida }, 'Registrando venta con forma de pago');
 
     const empleado = await prisma.empleado.findUnique({
       where: { id: parseInt(empleadoId) }
@@ -135,7 +141,8 @@ export default async function movimientoRoutes(fastify, options) {
             empleadoId: parseInt(empleadoId),
             productoId: parseInt(item.productoId),
             cantidad: -cantidadNum,
-            tipo: 'venta'
+            tipo: 'venta',
+            formaPago: formaPagoValida
           },
           include: {
             producto: { select: { id: true, nombre: true, precio: true } }
@@ -149,6 +156,14 @@ export default async function movimientoRoutes(fastify, options) {
       }
       return resultados;
     });
+
+    // Asegurar formaPago por si el create no lo persistió (compatibilidad)
+    if (formaPagoValida && movimientosCreados.length > 0) {
+      await prisma.movimientoStock.updateMany({
+        where: { id: { in: movimientosCreados.map((m) => m.id) } },
+        data: { formaPago: formaPagoValida }
+      });
+    }
 
     return reply.code(201).send({
       movimientos: movimientosCreados
@@ -205,9 +220,9 @@ export default async function movimientoRoutes(fastify, options) {
     });
   });
 
-  // Obtener historial de movimientos
+  // Obtener historial de movimientos (paginado: limit, offset; devuelve total)
   fastify.get('/', async (request, reply) => {
-    const { empleadoId, productoId, tipo, desde, hasta, limit } = request.query;
+    const { empleadoId, productoId, tipo, desde, hasta, limit, offset } = request.query;
 
     const where = {};
     if (empleadoId) where.empleadoId = parseInt(empleadoId);
@@ -219,21 +234,29 @@ export default async function movimientoRoutes(fastify, options) {
       if (hasta) where.fecha.lte = new Date(hasta);
     }
 
-    const movimientos = await prisma.movimientoStock.findMany({
-      where,
-      include: {
-        empleado: {
-          select: { id: true, nombre: true }
-        },
-        producto: {
-          select: { id: true, nombre: true, precio: true }
-        }
-      },
-      orderBy: { fecha: 'desc' },
-      take: limit ? parseInt(limit) : 100
-    });
+    const take = limit ? Math.min(parseInt(limit) || 50, 100) : 50;
+    const skip = offset ? Math.max(0, parseInt(offset)) : 0;
 
-    return { movimientos };
+    const [total, movimientos] = await Promise.all([
+      prisma.movimientoStock.count({ where }),
+      prisma.movimientoStock.findMany({
+        where,
+        include: {
+          empleado: { select: { id: true, nombre: true } },
+          producto: { select: { id: true, nombre: true, precio: true } }
+        },
+        orderBy: { fecha: 'desc' },
+        take,
+        skip
+      })
+    ]);
+
+    const movimientosConFormaPago = movimientos.map((m) => ({
+      ...m,
+      formaPago: m.formaPago ?? null
+    }));
+
+    return { movimientos: movimientosConFormaPago, total };
   });
 }
 

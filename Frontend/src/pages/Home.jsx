@@ -2,13 +2,11 @@ import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { isOnline, getHistorial } from '../services/api';
 import { getMovimientosPendientes } from '../services/storage';
-import EscanerCodigo from '../components/EscanerCodigo';
 
 function Home({ empleado, onLogout }) {
   const navigate = useNavigate();
-  const [mostrarEscaner, setMostrarEscaner] = useState(false);
   const [online, setOnline] = useState(true);
-  const [ventasHoy, setVentasHoy] = useState(null);
+  const [resumenHoy, setResumenHoy] = useState(null); // { total, efectivo, transferencia }
   const [pendientesCount, setPendientesCount] = useState(0);
 
   useEffect(() => {
@@ -22,7 +20,7 @@ function Home({ empleado, onLogout }) {
     };
   }, []);
 
-  useEffect(() => {
+  const cargarResumenHoy = () => {
     if (!empleado?.id) return;
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
@@ -36,13 +34,32 @@ function Home({ empleado, onLogout }) {
       limit: '500'
     })
       .then((res) => {
-        const total = (res.movimientos || []).reduce(
-          (sum, mov) => sum + (mov.producto?.precio || 0) * Math.abs(mov.cantidad || 0),
-          0
-        );
-        setVentasHoy(total);
+        const movimientos = res.movimientos || [];
+        let total = 0;
+        let efectivo = 0;
+        let transferencia = 0;
+        for (const mov of movimientos) {
+          const monto = (mov.producto?.precio || 0) * Math.abs(mov.cantidad || 0);
+          total += monto;
+          const fp = mov.formaPago;
+          if (fp === 'efectivo') efectivo += monto;
+          else if (fp === 'transferencia') transferencia += monto;
+        }
+        setResumenHoy({ total, efectivo, transferencia });
       })
-      .catch(() => setVentasHoy(null));
+      .catch(() => setResumenHoy(null));
+  };
+
+  useEffect(() => {
+    cargarResumenHoy();
+  }, [empleado?.id]);
+
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === 'visible') cargarResumenHoy();
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
   }, [empleado?.id]);
 
   useEffect(() => {
@@ -59,21 +76,6 @@ function Home({ empleado, onLogout }) {
     return () => clearInterval(interval);
   }, []);
 
-  const handleCodigoEscaneado = (codigo) => {
-    setMostrarEscaner(false);
-    // Buscar producto y navegar a venta
-    navigate(`/venta?codigo=${codigo}`);
-  };
-
-  if (mostrarEscaner) {
-    return (
-      <EscanerCodigo
-        onCodigoEscaneado={handleCodigoEscaneado}
-        onCancelar={() => setMostrarEscaner(false)}
-      />
-    );
-  }
-
   return (
     <div className="container vista-page">
       <header className="vista-header">
@@ -83,9 +85,21 @@ function Home({ empleado, onLogout }) {
             <p style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>
               {online ? 'En línea' : 'Sin conexión'}
             </p>
-            {ventasHoy !== null && (
-              <p style={{ fontSize: '15px', fontWeight: 700, color: 'var(--green-light)' }}>
-                Hoy: ${ventasHoy.toFixed(2)}
+            {resumenHoy !== null && (
+              <p
+                style={{
+                  fontSize: '15px',
+                  fontWeight: 700,
+                  color: 'var(--green-light)',
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 'clamp(0.75rem, 4vw, 2rem)',
+                  margin: 0
+                }}
+              >
+                <span>Hoy: ${resumenHoy.total.toFixed(2)}</span>
+                <span>Efectivo: ${resumenHoy.efectivo.toFixed(2)}</span>
+                <span>Transferencia: ${resumenHoy.transferencia.toFixed(2)}</span>
               </p>
             )}
             {pendientesCount > 0 && (
@@ -102,7 +116,7 @@ function Home({ empleado, onLogout }) {
 
       <section className="vista-card home-actions">
         <button
-          onClick={() => setMostrarEscaner(true)}
+          onClick={() => navigate('/venta')}
           className="btn-primary w-full"
         >
           Nueva venta

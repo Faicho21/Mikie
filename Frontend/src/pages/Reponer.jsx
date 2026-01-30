@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAllProductos, registrarReposicion, updateProducto, createProducto, isOnline } from '../services/api';
+import { FixedSizeList as List } from 'react-window';
+import { getAllProductos, registrarReposicion, updateProducto, createProducto, deleteProducto, isOnline } from '../services/api';
 import { getAllProductosFromCache } from '../services/storage';
+import EscanerCodigo from '../components/EscanerCodigo';
 
 function Reponer({ empleado }) {
   const navigate = useNavigate();
@@ -15,10 +17,13 @@ function Reponer({ empleado }) {
   const [filtro, setFiltro] = useState('');
   const [mostrarNuevoProducto, setMostrarNuevoProducto] = useState(false);
   const [guardandoNuevo, setGuardandoNuevo] = useState(false);
+  const [modoEliminar, setModoEliminar] = useState(false);
+  const [eliminandoId, setEliminandoId] = useState(null);
   const [nuevoNombre, setNuevoNombre] = useState('');
   const [nuevoCodigo, setNuevoCodigo] = useState('');
   const [nuevoPrecio, setNuevoPrecio] = useState('');
   const [nuevoStock, setNuevoStock] = useState('0');
+  const [mostrarEscanerCodigo, setMostrarEscanerCodigo] = useState(false);
 
   useEffect(() => {
     cargarProductos();
@@ -114,12 +119,40 @@ function Reponer({ empleado }) {
     }
   };
 
+  const handleEliminarProducto = async (p) => {
+    if (!window.confirm(`¿Eliminar el producto "${p.nombre}"? Ya no aparecerá en el listado.`)) return;
+    setEliminandoId(p.id);
+    setError('');
+    try {
+      await deleteProducto(p.id);
+      setModoEliminar(false);
+      setProductoSeleccionado(null);
+      cargarProductos();
+    } catch (err) {
+      setError(err.message || 'Error al eliminar el producto');
+    } finally {
+      setEliminandoId(null);
+    }
+  };
+
   const productosFiltrados = productos.filter(
     (p) =>
       !filtro.trim() ||
       (p.nombre && p.nombre.toLowerCase().includes(filtro.toLowerCase())) ||
       (p.codigoBarra && p.codigoBarra.includes(filtro))
   );
+
+  if (mostrarEscanerCodigo) {
+    return (
+      <EscanerCodigo
+        onCodigoEscaneado={(codigo) => {
+          setNuevoCodigo(codigo);
+          setMostrarEscanerCodigo(false);
+        }}
+        onCancelar={() => setMostrarEscanerCodigo(false)}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -150,11 +183,19 @@ function Reponer({ empleado }) {
         />
         <button
           type="button"
-          onClick={() => { setMostrarNuevoProducto(!mostrarNuevoProducto); setError(''); setProductoSeleccionado(null); }}
+          onClick={() => { setMostrarNuevoProducto(!mostrarNuevoProducto); setError(''); setProductoSeleccionado(null); setModoEliminar(false); }}
           className="btn-primary"
           style={{ width: '100%', marginTop: '12px', padding: '14px' }}
         >
-          {mostrarNuevoProducto ? 'Cancelar' : 'Agregar producto nuevo'}
+          {mostrarNuevoProducto ? 'Cancelar' : 'Agregar producto'}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setModoEliminar(!modoEliminar); setError(''); setProductoSeleccionado(null); setMostrarNuevoProducto(false); }}
+          className="btn-secondary"
+          style={{ width: '100%', marginTop: '10px', padding: '14px' }}
+        >
+          {modoEliminar ? 'Cancelar' : 'Eliminar producto'}
         </button>
       </section>
 
@@ -174,12 +215,23 @@ function Reponer({ empleado }) {
             </div>
             <div className="mb-3">
               <label className="block mb-2">Código de barras (opcional)</label>
-              <input
-                type="text"
-                value={nuevoCodigo}
-                onChange={(e) => setNuevoCodigo(e.target.value)}
-                placeholder="Ej: 770037000885"
-              />
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  value={nuevoCodigo}
+                  onChange={(e) => setNuevoCodigo(e.target.value)}
+                  placeholder="Ej: 770037000885"
+                  style={{ flex: 1, minWidth: '140px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarEscanerCodigo(true)}
+                  className="btn-secondary"
+                  style={{ flexShrink: 0 }}
+                >
+                  Escanear código
+                </button>
+              </div>
             </div>
             <div className="mb-3">
               <label className="block mb-2">Precio *</label>
@@ -279,31 +331,91 @@ function Reponer({ empleado }) {
         </div>
       ) : null}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-        {productosFiltrados.map((p) => {
-          const minimo = p.stockMinimo != null ? p.stockMinimo : 0;
-          const esBajo = p.stock <= minimo;
-          return (
-            <div
-              key={p.id}
-              className={`producto-card ${esBajo ? 'stock-bajo' : ''}`}
-              onClick={() => { setProductoSeleccionado(p); setCantidad('1'); setPrecio(''); setError(''); }}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && (setProductoSeleccionado(p), setCantidad('1'), setPrecio(''), setError(''))}
-            >
-              <h3 className="producto-nombre">{p.nombre}</h3>
-              {p.codigoBarra && <p className="producto-codigo">Código: {p.codigoBarra}</p>}
-              <div className="producto-meta">
-                <div>
-                  <p className="producto-stock">Stock: {p.stock}</p>
-                  {esBajo && <span className="badge badge-stock-bajo">Stock bajo</span>}
+      {modoEliminar && (
+        <p className="text-muted" style={{ marginBottom: '12px', fontSize: '14px' }}>
+          Tocá el producto que quieras eliminar y confirmá.
+        </p>
+      )}
+
+      {productosFiltrados.length > 0 && (
+        <div className="reponer-list-container">
+          <List
+            height={Math.min(window.innerHeight * 0.45, 380)}
+            itemCount={productosFiltrados.length}
+            itemSize={100}
+            width="100%"
+            itemData={{
+              list: productosFiltrados,
+              modoEliminar,
+              eliminandoId,
+              handleEliminarProducto,
+              setProductoSeleccionado,
+              setCantidad,
+              setPrecio,
+              setError
+            }}
+          >
+            {({ index, style, data }) => {
+              const p = data.list[index];
+              const minimo = p.stockMinimo != null ? p.stockMinimo : 0;
+              const esBajo = p.stock <= minimo;
+              return (
+                <div style={style} className="reponer-list-item">
+                  <div
+                    className={`producto-card ${esBajo ? 'stock-bajo' : ''}`}
+                    style={data.modoEliminar ? { display: 'flex', alignItems: 'center', gap: '12px' } : undefined}
+                    onClick={() => {
+                      if (data.modoEliminar) {
+                        data.handleEliminarProducto(p);
+                      } else {
+                        data.setProductoSeleccionado(p);
+                        data.setCantidad('1');
+                        data.setPrecio('');
+                        data.setError('');
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        if (data.modoEliminar) data.handleEliminarProducto(p);
+                        else {
+                          data.setProductoSeleccionado(p);
+                          data.setCantidad('1');
+                          data.setPrecio('');
+                          data.setError('');
+                        }
+                      }
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <h3 className="producto-nombre">{p.nombre}</h3>
+                      {p.codigoBarra && <p className="producto-codigo">Código: {p.codigoBarra}</p>}
+                      <div className="producto-meta">
+                        <div>
+                          <p className="producto-stock">Stock: {p.stock}</p>
+                          {esBajo && <span className="badge badge-stock-bajo">Stock bajo</span>}
+                        </div>
+                      </div>
+                    </div>
+                    {data.modoEliminar && (
+                      <button
+                        type="button"
+                        className="btn-danger"
+                        disabled={data.eliminandoId === p.id}
+                        onClick={(e) => { e.stopPropagation(); data.handleEliminarProducto(p); }}
+                        style={{ flexShrink: 0, marginLeft: '12px' }}
+                      >
+                        {data.eliminandoId === p.id ? 'Eliminando...' : 'Eliminar'}
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              );
+            }}
+          </List>
+        </div>
+      )}
 
       {productosFiltrados.length === 0 && !error && (
         <div className="productos-empty">

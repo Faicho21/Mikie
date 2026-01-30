@@ -7,12 +7,5 @@
   "background_color": "#0a0a0a",
   "theme_color": "#14532d",
   "orientation": "portrait-primary",
-  "icons": [
-    {
-      "src": "/vite.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    }
-  ]
+  "icons": []
 }

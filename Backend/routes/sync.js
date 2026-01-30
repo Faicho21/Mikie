@@ -54,6 +54,7 @@ export default async function syncRoutes(fastify, options) {
             continue;
           }
 
+          const formaPagoValida = mov.formaPago === 'efectivo' || mov.formaPago === 'transferencia' ? mov.formaPago : null;
           const resultado = await prisma.$transaction(async (tx) => {
             const movimiento = await tx.movimientoStock.create({
               data: {
@@ -61,7 +62,8 @@ export default async function syncRoutes(fastify, options) {
                 productoId: parseInt(productoId),
                 cantidad: -parseInt(cantidad),
                 tipo: 'venta',
-                fecha: fecha ? new Date(fecha) : new Date()
+                fecha: fecha ? new Date(fecha) : new Date(),
+                formaPago: formaPagoValida
               }
             });
 
